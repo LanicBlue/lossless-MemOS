@@ -69,6 +69,8 @@ export type CreateConversationInput = {
   sessionId: string;
   sessionKey?: string;
   title?: string;
+  agentId?: string;
+  isPersistent?: boolean;
 };
 
 export type ConversationRecord = {
@@ -79,6 +81,8 @@ export type ConversationRecord = {
   bootstrappedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  agentId: string | null;
+  isPersistent: boolean;
 };
 
 export type MessageSearchInput = {
@@ -109,6 +113,8 @@ interface ConversationRow {
   bootstrapped_at: string | null;
   created_at: string;
   updated_at: string;
+  agent_id: string | null;
+  is_persistent: number;
 }
 
 interface MessageRow {
@@ -163,6 +169,8 @@ function toConversationRecord(row: ConversationRow): ConversationRecord {
     bootstrappedAt: row.bootstrapped_at ? new Date(row.bootstrapped_at) : null,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
+    agentId: row.agent_id ?? null,
+    isPersistent: row.is_persistent === 1,
   };
 }
 
@@ -276,12 +284,22 @@ export class ConversationStore {
 
   async createConversation(input: CreateConversationInput): Promise<ConversationRecord> {
     const result = this.db
-      .prepare(`INSERT INTO conversations (session_id, session_key, title) VALUES (?, ?, ?)`)
-      .run(input.sessionId, input.sessionKey ?? null, input.title ?? null);
+      .prepare(
+        `INSERT INTO conversations (session_id, session_key, title, agent_id, is_persistent)
+         VALUES (?, ?, ?, ?, ?)`
+      )
+      .run(
+        input.sessionId,
+        input.sessionKey ?? null,
+        input.title ?? null,
+        input.agentId ?? null,
+        input.isPersistent ? 1 : 0,
+      );
 
     const row = this.db
       .prepare(
-        `SELECT conversation_id, session_id, session_key, title, bootstrapped_at, created_at, updated_at
+        `SELECT conversation_id, session_id, session_key, title, bootstrapped_at, created_at, updated_at,
+                agent_id, is_persistent
        FROM conversations WHERE conversation_id = ?`,
       )
       .get(Number(result.lastInsertRowid)) as unknown as ConversationRow;
@@ -888,5 +906,59 @@ export class ConversationStore {
       }
     }
     return results;
+  }
+
+  // ── Persistent Agent operations ──────────────────────────────────────────────
+
+  /**
+   * Get or create the fixed conversation for a persistent agent.
+   * Persistent agents have one long-lived conversation that spans all sessions.
+   */
+  async getOrCreatePersistentConversation(agentId: string): Promise<ConversationRecord> {
+    // First try to find existing persistent conversation for this agent
+    const row = this.db
+      .prepare(
+        `SELECT conversation_id, session_id, session_key, title, bootstrapped_at, created_at, updated_at,
+                agent_id, is_persistent
+         FROM conversations
+         WHERE agent_id = ? AND is_persistent = 1
+         LIMIT 1`
+      )
+      .get(agentId) as unknown as ConversationRow | undefined;
+
+    if (row) {
+      return toConversationRecord(row);
+    }
+
+    // Create new persistent conversation for this agent
+    const result = this.db
+      .prepare(
+        `INSERT INTO conversations (session_id, agent_id, is_persistent)
+         VALUES (?, ?, 1)`
+      )
+      .run(`persistent:${agentId}`, agentId);
+
+    const newRow = this.db
+      .prepare(
+        `SELECT conversation_id, session_id, session_key, title, bootstrapped_at, created_at, updated_at,
+                agent_id, is_persistent
+         FROM conversations WHERE conversation_id = ?`
+      )
+      .get(Number(result.lastInsertRowid)) as unknown as ConversationRow;
+
+    return toConversationRecord(newRow);
+  }
+
+  /**
+   * Check if an agent is configured as persistent.
+   */
+  async isPersistentAgent(agentId: string): Promise<boolean> {
+    const row = this.db
+      .prepare(
+        `SELECT 1 AS found FROM conversations WHERE agent_id = ? AND is_persistent = 1 LIMIT 1`
+      )
+      .get(agentId) as { found: number } | undefined;
+
+    return row?.found === 1;
   }
 }

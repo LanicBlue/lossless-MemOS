@@ -42,6 +42,8 @@ export type LcmConfig = {
   timezone: string;
   /** When true, retroactively delete HEARTBEAT_OK turn cycles from LCM storage. */
   pruneHeartbeatOk: boolean;
+  /** List of agent IDs that should use persistent memory (e.g., ["main"]). */
+  persistentAgents: string[];
 };
 
 /** Safely coerce an unknown value to a finite number, or return undefined. */
@@ -185,5 +187,6 @@ export function resolveLcmConfig(
       env.LCM_PRUNE_HEARTBEAT_OK !== undefined
         ? env.LCM_PRUNE_HEARTBEAT_OK === "true"
         : toBool(pc.pruneHeartbeatOk) ?? false,
+    persistentAgents: toStrArray(pc.persistentAgents) ?? [],
   };
 }
