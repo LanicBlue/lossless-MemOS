@@ -44,6 +44,8 @@ export type LcmConfig = {
   pruneHeartbeatOk: boolean;
   /** List of agent IDs that should use persistent memory (e.g., ["main"]). */
   persistentAgents: string[];
+  /** Maximum summary depth to include in assembled context. Older/deeper summaries are evicted first. Infinity = no limit. */
+  maxSummaryDepth: number;
 };
 
 /** Safely coerce an unknown value to a finite number, or return undefined. */
@@ -188,5 +190,7 @@ export function resolveLcmConfig(
         ? env.LCM_PRUNE_HEARTBEAT_OK === "true"
         : toBool(pc.pruneHeartbeatOk) ?? false,
     persistentAgents: toStrArray(pc.persistentAgents) ?? [],
+    maxSummaryDepth:
+      toNumber(env.LCM_MAX_SUMMARY_DEPTH) ?? toNumber(pc.maxSummaryDepth) ?? Infinity,
   };
 }

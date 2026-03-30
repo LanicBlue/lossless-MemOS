@@ -16,6 +16,8 @@ export interface AssembleContextInput {
   tokenBudget: number;
   /** Number of most recent raw turns to always include (default: 8) */
   freshTailCount?: number;
+  /** Maximum summary depth to include. Summaries deeper than this are excluded from context. Infinity = no limit. */
+  maxSummaryDepth?: number;
 }
 
 export interface AssembleContextResult {
@@ -671,7 +673,21 @@ export class ContextAssembler {
     }
 
     // Step 2: Resolve each context item into a ResolvedItem
-    const resolved = await this.resolveItems(contextItems);
+    let resolved = await this.resolveItems(contextItems);
+
+    // Step 2.5: Filter out summaries exceeding max depth
+    const maxSummaryDepth = input.maxSummaryDepth ?? Infinity;
+    if (maxSummaryDepth < Infinity) {
+      const before = resolved.length;
+      resolved = resolved.filter(
+        (item) => item.isMessage || !item.summarySignal || item.summarySignal.depth <= maxSummaryDepth,
+      );
+      const dropped = before - resolved.length;
+      if (dropped > 0) {
+        // eslint-disable-next-line no-console
+        console.log(`[lcm] assembler: dropped ${dropped} summaries exceeding maxSummaryDepth=${maxSummaryDepth}`);
+      }
+    }
 
     // Count stats from the full (pre-truncation) set
     let rawMessageCount = 0;
