@@ -2272,6 +2272,7 @@ export class LcmContextEngine implements ContextEngine {
         tokenBudget,
         freshTailCount: this.config.freshTailCount,
         maxSummaryDepth: this.config.maxSummaryDepth,
+        maxNodesPerDepth: this.config.maxNodesPerDepth,
       });
 
       // If assembly produced no messages for a non-empty live session,

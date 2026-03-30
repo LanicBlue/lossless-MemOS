@@ -46,6 +46,14 @@ export type LcmConfig = {
   persistentAgents: string[];
   /** Maximum summary depth to include in assembled context. Older/deeper summaries are evicted first. Infinity = no limit. */
   maxSummaryDepth: number;
+  /**
+   * Per-depth node count cap for assembled context.
+   * Index = depth level (0 = leaf, 1 = first condensed, ...).
+   * During assembly, if a depth exceeds its cap, oldest nodes are dropped first.
+   * Infinity = no limit for that depth.
+   * Example: [20, 8, 4] → max 20 leaf summaries, 8 depth-1, 4 depth-2.
+   */
+  maxNodesPerDepth: number[];
 };
 
 /** Safely coerce an unknown value to a finite number, or return undefined. */
@@ -192,5 +200,30 @@ export function resolveLcmConfig(
     persistentAgents: toStrArray(pc.persistentAgents) ?? [],
     maxSummaryDepth:
       toNumber(env.LCM_MAX_SUMMARY_DEPTH) ?? toNumber(pc.maxSummaryDepth) ?? Infinity,
+    maxNodesPerDepth: resolveMaxNodesPerDepth(env.LCM_MAX_NODES_PER_DEPTH, pc.maxNodesPerDepth),
   };
+}
+
+/** Parse maxNodesPerDepth from env (comma-separated) or plugin config. */
+function resolveMaxNodesPerDepth(
+  envValue: string | undefined,
+  pcValue: unknown,
+): number[] {
+  // Env: "20,8,4" → [20, 8, 4]
+  if (envValue?.trim()) {
+    const nums = envValue.split(",").map((s) => {
+      const n = Number(s.trim());
+      return Number.isFinite(n) ? n : Infinity;
+    });
+    if (nums.length > 0) return nums;
+  }
+  // Plugin config: [20, 8, 4] or "20,8,4"
+  if (Array.isArray(pcValue) && pcValue.length > 0) {
+    return pcValue.map((v) => {
+      const n = typeof v === "number" ? v : Number(v);
+      return Number.isFinite(n) ? n : Infinity;
+    });
+  }
+  // Default: no limit
+  return [];
 }

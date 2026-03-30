@@ -18,6 +18,12 @@ export interface AssembleContextInput {
   freshTailCount?: number;
   /** Maximum summary depth to include. Summaries deeper than this are excluded from context. Infinity = no limit. */
   maxSummaryDepth?: number;
+  /**
+   * Per-depth node count cap. Index = depth level.
+   * Summaries exceeding the cap at their depth are dropped (oldest first).
+   * Empty array = no limit.
+   */
+  maxNodesPerDepth?: number[];
 }
 
 export interface AssembleContextResult {
@@ -686,6 +692,34 @@ export class ContextAssembler {
       if (dropped > 0) {
         // eslint-disable-next-line no-console
         console.log(`[lcm] assembler: dropped ${dropped} summaries exceeding maxSummaryDepth=${maxSummaryDepth}`);
+      }
+    }
+
+    // Step 2.6: Per-depth node count cap — drop oldest summaries when a depth exceeds its limit
+    const maxNodesPerDepth = input.maxNodesPerDepth;
+    if (maxNodesPerDepth && maxNodesPerDepth.length > 0) {
+      const before = resolved.length;
+      // Group summaries by depth, keep only the newest N per depth (drop oldest)
+      const depthCounts = new Map<number, number>();
+      // Walk from oldest to newest; count and mark excess for removal
+      const toRemove = new Set<number>();
+      for (let i = 0; i < resolved.length; i++) {
+        const item = resolved[i];
+        if (item.isMessage || !item.summarySignal) continue;
+        const depth = item.summarySignal.depth;
+        const cap = depth < maxNodesPerDepth.length ? maxNodesPerDepth[depth] : 0;
+        const count = (depthCounts.get(depth) ?? 0) + 1;
+        depthCounts.set(depth, count);
+        if (cap >= 0 && cap < Infinity && count > cap) {
+          toRemove.add(i);
+        }
+      }
+      if (toRemove.size > 0) {
+        resolved = resolved.filter((_, i) => !toRemove.has(i));
+        // eslint-disable-next-line no-console
+        console.log(
+          `[lcm] assembler: dropped ${toRemove.size} summaries exceeding maxNodesPerDepth (per-depth caps: [${maxNodesPerDepth.join(", ")}])`,
+        );
       }
     }
 
