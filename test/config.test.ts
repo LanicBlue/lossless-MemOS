@@ -10,8 +10,8 @@ describe("resolveLcmConfig", () => {
     expect(config.statelessSessionPatterns).toEqual([]);
     expect(config.skipStatelessSessions).toBe(true);
     expect(config.contextThreshold).toBe(0.75);
-    expect(config.freshTailCount).toBe(32);
-    expect(config.incrementalMaxDepth).toBe(0);
+    expect(config.freshTailCount).toBe(64);
+    expect(config.incrementalMaxDepth).toBe(1);
     expect(config.leafMinFanout).toBe(8);
     expect(config.condensedMinFanout).toBe(4);
     expect(config.condensedMinFanoutHard).toBe(2);
@@ -133,7 +133,7 @@ describe("resolveLcmConfig", () => {
       enabled: "maybe",
     });
     expect(config.contextThreshold).toBe(0.75); // falls through to default
-    expect(config.freshTailCount).toBe(32); // falls through to default
+    expect(config.freshTailCount).toBe(64); // falls through to default
     expect(config.enabled).toBe(true); // falls through to default
   });
 

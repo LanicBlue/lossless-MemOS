@@ -38,7 +38,7 @@ export interface CompactionConfig {
   condensedMinFanout: number;
   /** Relaxed minimum fanout for hard-trigger sweeps. */
   condensedMinFanoutHard: number;
-  /** Incremental depth passes to run after each leaf compaction (default 0). */
+  /** Incremental depth passes to run after each leaf compaction (default 1). */
   incrementalMaxDepth: number;
   /** Max source tokens to compact per leaf/condensed chunk (default 20000) */
   leafChunkTokens?: number;

@@ -94,9 +94,9 @@ Add a `lossless-claw` entry under `plugins.entries` in your OpenClaw config:
       "lossless-claw": {
         "enabled": true,
         "config": {
-          "freshTailCount": 32,
+          "freshTailCount": 64,
           "contextThreshold": 0.75,
-          "incrementalMaxDepth": -1,
+          "incrementalMaxDepth": 1,
           "ignoreSessionPatterns": [
             "agent:*:cron:**"
           ],
@@ -121,11 +121,11 @@ Add a `lossless-claw` entry under `plugins.entries` in your OpenClaw config:
 | `LCM_STATELESS_SESSION_PATTERNS` | `""` | Comma-separated glob patterns for session keys that may read from LCM but never write to it |
 | `LCM_SKIP_STATELESS_SESSIONS` | `true` | Enable stateless-session write skipping for matching session keys |
 | `LCM_CONTEXT_THRESHOLD` | `0.75` | Fraction of context window that triggers compaction (0.0–1.0) |
-| `LCM_FRESH_TAIL_COUNT` | `32` | Number of recent messages protected from compaction |
+| `LCM_FRESH_TAIL_COUNT` | `64` | Number of recent messages protected from compaction |
 | `LCM_LEAF_MIN_FANOUT` | `8` | Minimum raw messages per leaf summary |
 | `LCM_CONDENSED_MIN_FANOUT` | `4` | Minimum summaries per condensed node |
 | `LCM_CONDENSED_MIN_FANOUT_HARD` | `2` | Relaxed fanout for forced compaction sweeps |
-| `LCM_INCREMENTAL_MAX_DEPTH` | `0` | How deep incremental compaction goes (0 = leaf only, -1 = unlimited) |
+| `LCM_INCREMENTAL_MAX_DEPTH` | `1` | How deep incremental compaction goes (0 = leaf only, 1 = one condensed pass, -1 = unlimited) |
 | `LCM_LEAF_CHUNK_TOKENS` | `20000` | Max source tokens per leaf compaction chunk |
 | `LCM_LEAF_TARGET_TOKENS` | `1200` | Target token count for leaf summaries |
 | `LCM_CONDENSED_TARGET_TOKENS` | `2000` | Target token count for condensed summaries |
@@ -198,13 +198,13 @@ If `summaryModel` already includes a provider prefix such as `anthropic/claude-s
 ### Recommended starting configuration
 
 ```
-LCM_FRESH_TAIL_COUNT=32
-LCM_INCREMENTAL_MAX_DEPTH=-1
+LCM_FRESH_TAIL_COUNT=64
+LCM_INCREMENTAL_MAX_DEPTH=1
 LCM_CONTEXT_THRESHOLD=0.75
 ```
 
-- **freshTailCount=32** protects the last 32 messages from compaction, giving the model enough recent context for continuity.
-- **incrementalMaxDepth=-1** enables unlimited automatic condensation after each compaction pass — the DAG cascades as deep as needed. Set to `0` (default) for leaf-only, or a positive integer for a specific depth cap.
+- **freshTailCount=64** protects the last 64 messages from compaction, giving the model more recent context for continuity.
+- **incrementalMaxDepth=1** runs one condensed pass after each leaf compaction by default. Set to `0` for leaf-only behavior, a larger positive integer for a deeper cap, or `-1` for unlimited cascading.
 - **contextThreshold=0.75** triggers compaction when context reaches 75% of the model's window, leaving headroom for the model's response.
 
 ### Session exclusion patterns

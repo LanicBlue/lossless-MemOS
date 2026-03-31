@@ -140,7 +140,7 @@ export function resolveLcmConfig(
         ?? toNumber(pc.contextThreshold) ?? 0.75,
     freshTailCount:
       (env.LCM_FRESH_TAIL_COUNT !== undefined ? parseInt(env.LCM_FRESH_TAIL_COUNT, 10) : undefined)
-        ?? toNumber(pc.freshTailCount) ?? 32,
+        ?? toNumber(pc.freshTailCount) ?? 64,
     leafMinFanout:
       (env.LCM_LEAF_MIN_FANOUT !== undefined ? parseInt(env.LCM_LEAF_MIN_FANOUT, 10) : undefined)
         ?? toNumber(pc.leafMinFanout) ?? 8,
@@ -152,7 +152,7 @@ export function resolveLcmConfig(
         ?? toNumber(pc.condensedMinFanoutHard) ?? 2,
     incrementalMaxDepth:
       (env.LCM_INCREMENTAL_MAX_DEPTH !== undefined ? parseInt(env.LCM_INCREMENTAL_MAX_DEPTH, 10) : undefined)
-        ?? toNumber(pc.incrementalMaxDepth) ?? 0,
+        ?? toNumber(pc.incrementalMaxDepth) ?? 1,
     leafChunkTokens:
       (env.LCM_LEAF_CHUNK_TOKENS !== undefined ? parseInt(env.LCM_LEAF_CHUNK_TOKENS, 10) : undefined)
         ?? toNumber(pc.leafChunkTokens) ?? 20000,
