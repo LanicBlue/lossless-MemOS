@@ -21,7 +21,10 @@ When a conversation grows beyond the model's context window, OpenClaw (just like
 2. **Summarizes chunks** of older messages into summaries using your configured LLM
 3. **Condenses summaries** into higher-level nodes as they accumulate, forming a DAG (directed acyclic graph)
 4. **Assembles context** each turn by combining summaries + recent raw messages
-5. **Provides tools** (`lcm_grep`, `lcm_describe`, `lcm_expand`) so agents can search and recall details from compacted history
+5. **Depth-based capping** automatically limits mid-level summaries (e.g., depth=1) to prevent unbounded token growth
+6. **Provides tools** (`lcm_grep`, `lcm_describe`, `lcm_expand`) so agents can search and recall details from compacted history
+
+**Persistent Agents mode**: Certain agents can be configured to use a single, long-lived conversation that persists across all sessions, enabling true long-term memory.
 
 Nothing is lost. Raw messages stay in the database. Summaries link back to their source messages. Agents can drill into any summary to recover the original detail.
 
@@ -143,6 +146,7 @@ Add a `lossless-claw` entry under `plugins.entries` in your OpenClaw config:
 | `LCM_DELEGATION_TIMEOUT_MS` | `120000` | Max time to wait for delegated `lcm_expand_query` sub-agent completion |
 | `LCM_AUTOCOMPACT_DISABLED` | `false` | Disable automatic compaction after turns |
 | `LCM_PRUNE_HEARTBEAT_OK` | `false` | Retroactively delete `HEARTBEAT_OK` turn cycles from LCM storage |
+| `LCM_PERSISTENT_AGENTS` | `[]` | List of agent IDs that use persistent memory (e.g., `["main"]`) |
 
 ### Expansion model override requirements
 
@@ -200,6 +204,79 @@ For compaction summarization, lossless-claw resolves the model in this order:
 If `summaryModel` already includes a provider prefix such as `anthropic/claude-sonnet-4-20250514`, `summaryProvider` is ignored for that choice. Otherwise, the provider falls back to the matching override, then `OPENCLAW_PROVIDER`, then the provider inferred by the caller.
 
 ### Recommended starting configuration
+
+#### For 200K context windows
+
+Based on 10,000-round simulation testing (~530 tokens/message), this configuration provides stable token control at ~46% budget usage:
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "lossless-claw": {
+        "enabled": true,
+        "config": {
+          "freshTailCount": 64,
+          "leafMinFanout": 24,
+          "condensedMinFanout": 8,
+          "leafChunkTokens": 20000,
+          "leafTargetTokens": 2400,
+          "condensedTargetTokens": 2000,
+          "incrementalMaxDepth": 1,
+          "contextThreshold": 0.75
+        }
+      }
+    }
+  }
+}
+```
+
+Environment variable equivalent:
+
+```bash
+LCM_FRESH_TAIL_COUNT=64
+LCM_LEAF_MIN_FANOUT=24
+LCM_CONDENSED_MIN_FANOUT=8
+LCM_LEAF_CHUNK_TOKENS=20000
+LCM_LEAF_TARGET_TOKENS=2400
+LCM_CONDENSED_TARGET_TOKENS=2000
+LCM_INCREMENTAL_MAX_DEPTH=1
+LCM_CONTEXT_THRESHOLD=0.75
+```
+
+**Key settings explained:**
+
+- **freshTailCount=64** protects the last 64 messages from compaction, giving the model more recent context for continuity
+- **leafMinFanout=24** requires 24+ messages before leaf compression, reducing depth=0 summary creation rate
+- **condensedMinFanout=8** requires 8+ depth=0 summaries before condensing to depth=1
+- **depth=1 capping (built-in)** automatically limits depth=1 summaries to 8, preventing unbounded growth
+- **leafChunkTokens=20000** balances chunk size with summary frequency
+- **incrementalMaxDepth=1** enables one condensed pass for deeper compression
+- **contextThreshold=0.75** triggers compaction at 75% of budget, leaving room for responses
+
+#### For persistent agents (long-lived conversations)
+
+To enable persistent memory for specific agents that should maintain a single conversation across all sessions:
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "lossless-claw": {
+        "config": {
+          "persistentAgents": ["main"]
+        }
+      }
+    }
+  }
+}
+```
+
+Environment variable: `LCM_PERSISTENT_AGENTS=main`
+
+Persistent agents use a single, long-lived conversation that accumulates all messages and summaries across multiple sessions. This is useful for agents that need to maintain context and continuity between sessions (e.g., a "main" assistant that should remember everything).
+
+#### Default configuration (lighter workloads)
 
 ```
 LCM_FRESH_TAIL_COUNT=64
