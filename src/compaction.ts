@@ -488,8 +488,25 @@ export class CompactionEngine {
     if (incrementalMaxDepth > 0) {
       for (let targetDepth = 0; targetDepth < incrementalMaxDepth; targetDepth++) {
         const fanout = this.resolveFanoutForDepth(targetDepth, false);
+
+        // 用实际 summary 数量与 fanout 比较（不受 chunk token 限制）
+        const contextItems = await this.summaryStore.getContextItems(conversationId);
+        const freshTailOrdinal = this.resolveFreshTailOrdinal(contextItems);
+        let actualSummaryCount = 0;
+        for (const item of contextItems) {
+          if (item.ordinal >= freshTailOrdinal) break;
+          if (item.itemType !== "summary" || item.summaryId == null) continue;
+          const summary = await this.summaryStore.getSummary(item.summaryId);
+          if (summary && summary.depth === targetDepth) {
+            actualSummaryCount++;
+          }
+        }
+        if (actualSummaryCount < fanout) {
+          break;
+        }
+
         const chunk = await this.selectOldestChunkAtDepth(conversationId, targetDepth);
-        if (chunk.items.length < fanout || chunk.summaryTokens < condensedMinChunkTokens) {
+        if (chunk.items.length === 0 || chunk.summaryTokens < condensedMinChunkTokens) {
           break;
         }
 

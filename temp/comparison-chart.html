@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Compaction Comparison</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 20px; background: #1a1a1a; color: #e0e0e0; }
+        .chart-container { background: #2a2a2a; border-radius: 8px; padding: 20px; margin-bottom: 30px; }
+        h2 { margin-top: 0; color: #fff; }
+        canvas { display: block; width: 100%; }
+        .download-btn {
+            background: #4a9eff; color: white; border: none; padding: 10px 20px;
+            border-radius: 4px; cursor: pointer; font-size: 14px; margin-bottom: 20px;
+        }
+        .download-btn:hover { background: #3a8eef; }
+    </style>
+</head>
+<body>
+    <h1>Compaction Strategy Comparison</h1>
+    <button class="download-btn" onclick="downloadCSV()">Download CSV</button>
+
+    <div class="chart-container">
+        <h2>Total Tokens Over Time</h2>
+        <canvas id="tokenChart" height="300"></canvas>
+    </div>
+
+    <div class="chart-container">
+        <h2>Max Depth Over Time</h2>
+        <canvas id="maxDepthChart" height="300"></canvas>
+    </div>
+
+    <script>
+
+  const Originaltriggercompress_tokens = [[0,50000], [1,55000], [2,60000], [3,65000], [4,70000], [5,75000], [6,80000], [7,85000], [8,90000], [9,95000], [10,82400], [11,87400], [12,92400], [13,79800], [14,84800], [15,89800], [16,94800], [17,82200], [18,87200], [19,92200], [20,72000], [25,79400], [30,86800], [35,94200], [40,94000], [45,83800], [50,91200], [55,91000], [60,80800], [65,88200], [70,88000], [75,89400], [80,79200], [85,79000], [90,86400], [95,93800], [100,76000], [105,83400], [110,90800], [115,73000], [120,80400], [125,87800], [130,95200], [135,95000], [140,78800], [145,86200], [150,86000], [155,93400], [160,83200], [165,83000], [170,90400], [175,80200], [180,80000], [185,87400], [190,94800], [195,77000], [200,78400], [205,85800], [210,93200], [215,93000], [220,82800], [225,90200], [230,90000], [235,79800], [240,87200], [245,87000], [250,94400], [255,84200], [260,84000], [265,85400], [270,86800], [275,94200], [280,94000], [285,83800], [290,91200], [295,91000], [300,80800], [305,88200], [310,88000], [315,95400], [320,85200], [325,85000], [330,86400], [335,93800], [340,76000], [345,83400], [350,90800], [355,73000], [360,80400], [365,87800], [370,95200], [375,95000], [380,84800], [385,92200], [390,92000], [395,93400], [400,83200], [405,83000], [410,90400], [415,80200], [420,80000], [425,87400], [430,94800], [435,77000], [440,84400], [445,91800], [450,74000], [455,75400], [460,82800], [465,90200], [470,90000], [475,79800], [480,87200], [485,87000], [490,94400], [495,84200], [500,84000]];
+  const Originaltriggercompress_maxDepth = [[0,0], [1,0], [2,0], [3,0], [4,0], [5,0], [6,0], [7,0], [8,0], [9,0], [10,0], [11,0], [12,0], [13,0], [14,0], [15,0], [16,0], [17,0], [18,0], [19,0], [20,1], [25,1], [30,1], [35,1], [40,1], [45,1], [50,1], [55,1], [60,1], [65,1], [70,1], [75,2], [80,2], [85,2], [90,2], [95,2], [100,2], [105,2], [110,2], [115,2], [120,2], [125,2], [130,2], [135,2], [140,2], [145,2], [150,2], [155,2], [160,2], [165,2], [170,2], [175,2], [180,2], [185,2], [190,2], [195,2], [200,2], [205,2], [210,2], [215,2], [220,2], [225,2], [230,2], [235,2], [240,2], [245,2], [250,2], [255,2], [260,2], [265,2], [270,3], [275,3], [280,3], [285,3], [290,3], [295,3], [300,3], [305,3], [310,3], [315,3], [320,3], [325,3], [330,3], [335,3], [340,3], [345,3], [350,3], [355,3], [360,3], [365,3], [370,3], [375,3], [380,3], [385,3], [390,3], [395,3], [400,3], [405,3], [410,3], [415,3], [420,3], [425,3], [430,3], [435,3], [440,3], [445,3], [450,3], [455,3], [460,3], [465,3], [470,3], [475,3], [480,3], [485,3], [490,3], [495,3], [500,3]];
+
+  const Newtriggercompress_tokens = [[0,50000], [1,55000], [2,60000], [3,65000], [4,70000], [5,75000], [6,80000], [7,85000], [8,90000], [9,95000], [10,82400], [11,87400], [12,92400], [13,79800], [14,84800], [15,89800], [16,94800], [17,82200], [18,87200], [19,92200], [20,79600], [25,87000], [30,94400], [35,76600], [40,84000], [45,91400], [50,73600], [55,81000], [60,88400], [65,95800], [70,95600], [75,85400], [80,92800], [85,92600], [90,82400], [95,89800], [100,89600], [105,79400], [110,86800], [115,86600], [120,94000], [125,83800], [130,83600], [135,91000], [140,80800], [145,80600], [150,82000], [155,89400], [160,71600], [165,79000], [170,86400], [175,93800], [180,93600], [185,83400], [190,90800], [195,90600], [200,80400], [205,87800], [210,87600], [215,89000], [220,78800], [225,78600], [230,86000], [235,93400], [240,75600], [245,83000], [250,90400], [255,72600], [260,80000], [265,87400], [270,94800], [275,94600], [280,96000], [285,85800], [290,85600], [295,93000], [300,82800], [305,82600], [310,90000], [315,79800], [320,79600], [325,87000], [330,94400], [335,76600], [340,78000], [345,85400], [350,92800], [355,92600], [360,82400], [365,89800], [370,89600], [375,79400], [380,86800], [385,86600], [390,94000], [395,83800], [400,83600], [405,85000], [410,92400], [415,74600], [420,82000], [425,89400], [430,71600], [435,79000], [440,86400], [445,93800], [450,93600], [455,83400], [460,90800], [465,90600], [470,92000], [475,81800], [480,81600], [485,89000], [490,78800], [495,78600], [500,86000]];
+  const Newtriggercompress_maxDepth = [[0,0], [1,0], [2,0], [3,0], [4,0], [5,0], [6,0], [7,0], [8,0], [9,0], [10,0], [11,0], [12,0], [13,0], [14,0], [15,0], [16,0], [17,0], [18,0], [19,0], [20,0], [25,0], [30,0], [35,1], [40,1], [45,1], [50,1], [55,1], [60,1], [65,1], [70,1], [75,1], [80,1], [85,1], [90,1], [95,1], [100,1], [105,1], [110,1], [115,1], [120,1], [125,1], [130,1], [135,1], [140,1], [145,1], [150,2], [155,2], [160,2], [165,2], [170,2], [175,2], [180,2], [185,2], [190,2], [195,2], [200,2], [205,2], [210,2], [215,2], [220,2], [225,2], [230,2], [235,2], [240,2], [245,2], [250,2], [255,2], [260,2], [265,2], [270,2], [275,2], [280,2], [285,2], [290,2], [295,2], [300,2], [305,2], [310,2], [315,2], [320,2], [325,2], [330,2], [335,2], [340,2], [345,2], [350,2], [355,2], [360,2], [365,2], [370,2], [375,2], [380,2], [385,2], [390,2], [395,2], [400,2], [405,2], [410,2], [415,2], [420,2], [425,2], [430,2], [435,2], [440,2], [445,2], [450,2], [455,2], [460,2], [465,2], [470,2], [475,2], [480,2], [485,2], [490,2], [495,2], [500,2]];
+
+        function drawChart(canvasId, datasets, yMax, yLabel, stacked = false) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            const width = canvas.offsetWidth;
+            const height = canvas.height;
+
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+            ctx.scale(dpr, dpr);
+
+            const padding = { top: 20, right: 150, bottom: 40, left: 60 };
+            const chartW = width - padding.left - padding.right;
+            const chartH = height - padding.top - padding.bottom;
+
+            ctx.fillStyle = '#2a2a2a';
+            ctx.fillRect(0, 0, width, height);
+
+            let maxX = 0, maxY = 0;
+            datasets.forEach(ds => {
+                ds.data.forEach(([x, y]) => {
+                    if (x > maxX) maxX = x;
+                    if (y > maxY) maxY = y;
+                });
+            });
+            maxY = yMax || maxY * 1.1;
+
+            // 网格
+            ctx.strokeStyle = '#3a3a3a';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 5; i++) {
+                const y = padding.top + (chartH / 5) * i;
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(padding.left + chartW, y);
+                ctx.stroke();
+
+                const value = Math.round(maxY - (maxY / 5) * i);
+                ctx.fillStyle = '#888';
+                ctx.font = '12px system-ui';
+                ctx.textAlign = 'right';
+                ctx.fillText(value.toLocaleString(), padding.left - 10, y + 4);
+            }
+
+            // X 轴
+            for (let i = 0; i <= 10; i++) {
+                const x = padding.left + (chartW / 10) * i;
+                const value = Math.round((maxX / 10) * i);
+                ctx.fillStyle = '#888';
+                ctx.textAlign = 'center';
+                ctx.fillText(value, x, height - padding.bottom + 20);
+            }
+
+            ctx.save();
+            ctx.translate(15, height / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#aaa';
+            ctx.fillText(yLabel, 0, 0);
+            ctx.restore();
+
+            datasets.forEach((ds, idx) => {
+                if (ds.data.length < 2) return;
+
+                ctx.strokeStyle = ds.color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+
+                ds.data.forEach(([x, y], i) => {
+                    const px = padding.left + (x / maxX) * chartW;
+                    const py = padding.top + chartH - (y / maxY) * chartH;
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                });
+                ctx.stroke();
+
+                ctx.fillStyle = ds.color;
+                ctx.font = '13px system-ui';
+                ctx.textAlign = 'left';
+                const legendY = padding.top + (chartH / datasets.length) * idx + 15;
+                ctx.fillText(ds.label, padding.left + chartW + 10, legendY);
+            });
+        }
+
+        drawChart('tokenChart', [
+  { label: 'Original (trigger=compress=4)', data: Originaltriggercompress_tokens, color: '#ff5555' },
+  { label: 'New (trigger=8, compress=4)', data: Newtriggercompress_tokens, color: '#50fa7b' }
+        ], 128000, 'Tokens');
+
+        drawChart('maxDepthChart', [
+  { label: 'Original (trigger=compress=4)', data: Originaltriggercompress_maxDepth, color: '#ff5555' },
+  { label: 'New (trigger=8, compress=4)', data: Newtriggercompress_maxDepth, color: '#50fa7b' }
+        ], null, 'Max Depth');
+
+        function downloadCSV() {
+            const csv = "Round,Version,Tokens,Messages,MaxDepth,Depth0,Depth1,Depth2,Depth3,Depth4,Depth5,Depth6,Depth7,Depth8,Depth9,Depth10\n0,Original (trigger=compress=4),50000,100,0,0,0,0,0,0,0,0,0,0,0,0\n1,Original (trigger=compress=4),55000,110,0,0,0,0,0,0,0,0,0,0,0,0\n2,Original (trigger=compress=4),60000,120,0,0,0,0,0,0,0,0,0,0,0,0\n3,Original (trigger=compress=4),65000,130,0,0,0,0,0,0,0,0,0,0,0,0\n4,Original (trigger=compress=4),70000,140,0,0,0,0,0,0,0,0,0,0,0,0\n5,Original (trigger=compress=4),75000,150,0,0,0,0,0,0,0,0,0,0,0,0\n6,Original (trigger=compress=4),80000,160,0,0,0,0,0,0,0,0,0,0,0,0\n7,Original (trigger=compress=4),85000,170,0,0,0,0,0,0,0,0,0,0,0,0\n8,Original (trigger=compress=4),90000,180,0,0,0,0,0,0,0,0,0,0,0,0\n9,Original (trigger=compress=4),95000,190,0,0,0,0,0,0,0,0,0,0,0,0\n10,Original (trigger=compress=4),82400,160,0,1,0,0,0,0,0,0,0,0,0,0\n11,Original (trigger=compress=4),87400,170,0,1,0,0,0,0,0,0,0,0,0,0\n12,Original (trigger=compress=4),92400,180,0,1,0,0,0,0,0,0,0,0,0,0\n13,Original (trigger=compress=4),79800,150,0,2,0,0,0,0,0,0,0,0,0,0\n14,Original (trigger=compress=4),84800,160,0,2,0,0,0,0,0,0,0,0,0,0\n15,Original (trigger=compress=4),89800,170,0,2,0,0,0,0,0,0,0,0,0,0\n16,Original (trigger=compress=4),94800,180,0,2,0,0,0,0,0,0,0,0,0,0\n17,Original (trigger=compress=4),82200,150,0,3,0,0,0,0,0,0,0,0,0,0\n18,Original (trigger=compress=4),87200,160,0,3,0,0,0,0,0,0,0,0,0,0\n19,Original (trigger=compress=4),92200,170,0,3,0,0,0,0,0,0,0,0,0,0\n20,Original (trigger=compress=4),72000,140,1,0,1,0,0,0,0,0,0,0,0,0\n25,Original (trigger=compress=4),79400,150,1,1,1,0,0,0,0,0,0,0,0,0\n30,Original (trigger=compress=4),86800,160,1,2,1,0,0,0,0,0,0,0,0,0\n35,Original (trigger=compress=4),94200,170,1,3,1,0,0,0,0,0,0,0,0,0\n40,Original (trigger=compress=4),94000,180,1,0,2,0,0,0,0,0,0,0,0,0\n45,Original (trigger=compress=4),83800,150,1,2,2,0,0,0,0,0,0,0,0,0\n50,Original (trigger=compress=4),91200,160,1,3,2,0,0,0,0,0,0,0,0,0\n55,Original (trigger=compress=4),91000,170,1,0,3,0,0,0,0,0,0,0,0,0\n60,Original (trigger=compress=4),80800,140,1,2,3,0,0,0,0,0,0,0,0,0\n65,Original (trigger=compress=4),88200,150,1,3,3,0,0,0,0,0,0,0,0,0\n70,Original (trigger=compress=4),88000,160,1,0,4,0,0,0,0,0,0,0,0,0\n75,Original (trigger=compress=4),89400,170,2,1,0,1,0,0,0,0,0,0,0,0\n80,Original (trigger=compress=4),79200,140,2,3,0,1,0,0,0,0,0,0,0,0\n85,Original (trigger=compress=4),79000,150,2,0,1,1,0,0,0,0,0,0,0,0\n90,Original (trigger=compress=4),86400,160,2,1,1,1,0,0,0,0,0,0,0,0\n95,Original (trigger=compress=4),93800,170,2,2,1,1,0,0,0,0,0,0,0,0\n100,Original (trigger=compress=4),76000,140,2,0,2,1,0,0,0,0,0,0,0,0\n105,Original (trigger=compress=4),83400,150,2,1,2,1,0,0,0,0,0,0,0,0\n110,Original (trigger=compress=4),90800,160,2,2,2,1,0,0,0,0,0,0,0,0\n115,Original (trigger=compress=4),73000,130,2,0,3,1,0,0,0,0,0,0,0,0\n120,Original (trigger=compress=4),80400,140,2,1,3,1,0,0,0,0,0,0,0,0\n125,Original (trigger=compress=4),87800,150,2,2,3,1,0,0,0,0,0,0,0,0\n130,Original (trigger=compress=4),95200,160,2,3,3,1,0,0,0,0,0,0,0,0\n135,Original (trigger=compress=4),95000,170,2,0,4,1,0,0,0,0,0,0,0,0\n140,Original (trigger=compress=4),78800,140,2,2,0,2,0,0,0,0,0,0,0,0\n145,Original (trigger=compress=4),86200,150,2,3,0,2,0,0,0,0,0,0,0,0\n150,Original (trigger=compress=4),86000,160,2,0,1,2,0,0,0,0,0,0,0,0\n155,Original (trigger=compress=4),93400,170,2,1,1,2,0,0,0,0,0,0,0,0\n160,Original (trigger=compress=4),83200,140,2,3,1,2,0,0,0,0,0,0,0,0\n165,Original (trigger=compress=4),83000,150,2,0,2,2,0,0,0,0,0,0,0,0\n170,Original (trigger=compress=4),90400,160,2,1,2,2,0,0,0,0,0,0,0,0\n175,Original (trigger=compress=4),80200,130,2,3,2,2,0,0,0,0,0,0,0,0\n180,Original (trigger=compress=4),80000,140,2,0,3,2,0,0,0,0,0,0,0,0\n185,Original (trigger=compress=4),87400,150,2,1,3,2,0,0,0,0,0,0,0,0\n190,Original (trigger=compress=4),94800,160,2,2,3,2,0,0,0,0,0,0,0,0\n195,Original (trigger=compress=4),77000,130,2,0,4,2,0,0,0,0,0,0,0,0\n200,Original (trigger=compress=4),78400,140,2,1,0,3,0,0,0,0,0,0,0,0\n205,Original (trigger=compress=4),85800,150,2,2,0,3,0,0,0,0,0,0,0,0\n210,Original (trigger=compress=4),93200,160,2,3,0,3,0,0,0,0,0,0,0,0\n215,Original (trigger=compress=4),93000,170,2,0,1,3,0,0,0,0,0,0,0,0\n220,Original (trigger=compress=4),82800,140,2,2,1,3,0,0,0,0,0,0,0,0\n225,Original (trigger=compress=4),90200,150,2,3,1,3,0,0,0,0,0,0,0,0\n230,Original (trigger=compress=4),90000,160,2,0,2,3,0,0,0,0,0,0,0,0\n235,Original (trigger=compress=4),79800,130,2,2,2,3,0,0,0,0,0,0,0,0\n240,Original (trigger=compress=4),87200,140,2,3,2,3,0,0,0,0,0,0,0,0\n245,Original (trigger=compress=4),87000,150,2,0,3,3,0,0,0,0,0,0,0,0\n250,Original (trigger=compress=4),94400,160,2,1,3,3,0,0,0,0,0,0,0,0\n255,Original (trigger=compress=4),84200,130,2,3,3,3,0,0,0,0,0,0,0,0\n260,Original (trigger=compress=4),84000,140,2,0,4,3,0,0,0,0,0,0,0,0\n265,Original (trigger=compress=4),85400,150,2,1,0,4,0,0,0,0,0,0,0,0\n270,Original (trigger=compress=4),86800,160,3,2,0,0,1,0,0,0,0,0,0,0\n275,Original (trigger=compress=4),94200,170,3,3,0,0,1,0,0,0,0,0,0,0\n280,Original (trigger=compress=4),94000,180,3,0,1,0,1,0,0,0,0,0,0,0\n285,Original (trigger=compress=4),83800,150,3,2,1,0,1,0,0,0,0,0,0,0\n290,Original (trigger=compress=4),91200,160,3,3,1,0,1,0,0,0,0,0,0,0\n295,Original (trigger=compress=4),91000,170,3,0,2,0,1,0,0,0,0,0,0,0\n300,Original (trigger=compress=4),80800,140,3,2,2,0,1,0,0,0,0,0,0,0\n305,Original (trigger=compress=4),88200,150,3,3,2,0,1,0,0,0,0,0,0,0\n310,Original (trigger=compress=4),88000,160,3,0,3,0,1,0,0,0,0,0,0,0\n315,Original (trigger=compress=4),95400,170,3,1,3,0,1,0,0,0,0,0,0,0\n320,Original (trigger=compress=4),85200,140,3,3,3,0,1,0,0,0,0,0,0,0\n325,Original (trigger=compress=4),85000,150,3,0,4,0,1,0,0,0,0,0,0,0\n330,Original (trigger=compress=4),86400,160,3,1,0,1,1,0,0,0,0,0,0,0\n335,Original (trigger=compress=4),93800,170,3,2,0,1,1,0,0,0,0,0,0,0\n340,Original (trigger=compress=4),76000,140,3,0,1,1,1,0,0,0,0,0,0,0\n345,Original (trigger=compress=4),83400,150,3,1,1,1,1,0,0,0,0,0,0,0\n350,Original (trigger=compress=4),90800,160,3,2,1,1,1,0,0,0,0,0,0,0\n355,Original (trigger=compress=4),73000,130,3,0,2,1,1,0,0,0,0,0,0,0\n360,Original (trigger=compress=4),80400,140,3,1,2,1,1,0,0,0,0,0,0,0\n365,Original (trigger=compress=4),87800,150,3,2,2,1,1,0,0,0,0,0,0,0\n370,Original (trigger=compress=4),95200,160,3,3,2,1,1,0,0,0,0,0,0,0\n375,Original (trigger=compress=4),95000,170,3,0,3,1,1,0,0,0,0,0,0,0\n380,Original (trigger=compress=4),84800,140,3,2,3,1,1,0,0,0,0,0,0,0\n385,Original (trigger=compress=4),92200,150,3,3,3,1,1,0,0,0,0,0,0,0\n390,Original (trigger=compress=4),92000,160,3,0,4,1,1,0,0,0,0,0,0,0\n395,Original (trigger=compress=4),93400,170,3,1,0,2,1,0,0,0,0,0,0,0\n400,Original (trigger=compress=4),83200,140,3,3,0,2,1,0,0,0,0,0,0,0\n405,Original (trigger=compress=4),83000,150,3,0,1,2,1,0,0,0,0,0,0,0\n410,Original (trigger=compress=4),90400,160,3,1,1,2,1,0,0,0,0,0,0,0\n415,Original (trigger=compress=4),80200,130,3,3,1,2,1,0,0,0,0,0,0,0\n420,Original (trigger=compress=4),80000,140,3,0,2,2,1,0,0,0,0,0,0,0\n425,Original (trigger=compress=4),87400,150,3,1,2,2,1,0,0,0,0,0,0,0\n430,Original (trigger=compress=4),94800,160,3,2,2,2,1,0,0,0,0,0,0,0\n435,Original (trigger=compress=4),77000,130,3,0,3,2,1,0,0,0,0,0,0,0\n440,Original (trigger=compress=4),84400,140,3,1,3,2,1,0,0,0,0,0,0,0\n445,Original (trigger=compress=4),91800,150,3,2,3,2,1,0,0,0,0,0,0,0\n450,Original (trigger=compress=4),74000,120,3,0,4,2,1,0,0,0,0,0,0,0\n455,Original (trigger=compress=4),75400,130,3,1,0,3,1,0,0,0,0,0,0,0\n460,Original (trigger=compress=4),82800,140,3,2,0,3,1,0,0,0,0,0,0,0\n465,Original (trigger=compress=4),90200,150,3,3,0,3,1,0,0,0,0,0,0,0\n470,Original (trigger=compress=4),90000,160,3,0,1,3,1,0,0,0,0,0,0,0\n475,Original (trigger=compress=4),79800,130,3,2,1,3,1,0,0,0,0,0,0,0\n480,Original (trigger=compress=4),87200,140,3,3,1,3,1,0,0,0,0,0,0,0\n485,Original (trigger=compress=4),87000,150,3,0,2,3,1,0,0,0,0,0,0,0\n490,Original (trigger=compress=4),94400,160,3,1,2,3,1,0,0,0,0,0,0,0\n495,Original (trigger=compress=4),84200,130,3,3,2,3,1,0,0,0,0,0,0,0\n500,Original (trigger=compress=4),84000,140,3,0,3,3,1,0,0,0,0,0,0,0\n0,New (trigger=8, compress=4),50000,100,0,0,0,0,0,0,0,0,0,0,0,0\n1,New (trigger=8, compress=4),55000,110,0,0,0,0,0,0,0,0,0,0,0,0\n2,New (trigger=8, compress=4),60000,120,0,0,0,0,0,0,0,0,0,0,0,0\n3,New (trigger=8, compress=4),65000,130,0,0,0,0,0,0,0,0,0,0,0,0\n4,New (trigger=8, compress=4),70000,140,0,0,0,0,0,0,0,0,0,0,0,0\n5,New (trigger=8, compress=4),75000,150,0,0,0,0,0,0,0,0,0,0,0,0\n6,New (trigger=8, compress=4),80000,160,0,0,0,0,0,0,0,0,0,0,0,0\n7,New (trigger=8, compress=4),85000,170,0,0,0,0,0,0,0,0,0,0,0,0\n8,New (trigger=8, compress=4),90000,180,0,0,0,0,0,0,0,0,0,0,0,0\n9,New (trigger=8, compress=4),95000,190,0,0,0,0,0,0,0,0,0,0,0,0\n10,New (trigger=8, compress=4),82400,160,0,1,0,0,0,0,0,0,0,0,0,0\n11,New (trigger=8, compress=4),87400,170,0,1,0,0,0,0,0,0,0,0,0,0\n12,New (trigger=8, compress=4),92400,180,0,1,0,0,0,0,0,0,0,0,0,0\n13,New (trigger=8, compress=4),79800,150,0,2,0,0,0,0,0,0,0,0,0,0\n14,New (trigger=8, compress=4),84800,160,0,2,0,0,0,0,0,0,0,0,0,0\n15,New (trigger=8, compress=4),89800,170,0,2,0,0,0,0,0,0,0,0,0,0\n16,New (trigger=8, compress=4),94800,180,0,2,0,0,0,0,0,0,0,0,0,0\n17,New (trigger=8, compress=4),82200,150,0,3,0,0,0,0,0,0,0,0,0,0\n18,New (trigger=8, compress=4),87200,160,0,3,0,0,0,0,0,0,0,0,0,0\n19,New (trigger=8, compress=4),92200,170,0,3,0,0,0,0,0,0,0,0,0,0\n20,New (trigger=8, compress=4),79600,140,0,4,0,0,0,0,0,0,0,0,0,0\n25,New (trigger=8, compress=4),87000,150,0,5,0,0,0,0,0,0,0,0,0,0\n30,New (trigger=8, compress=4),94400,160,0,6,0,0,0,0,0,0,0,0,0,0\n35,New (trigger=8, compress=4),76600,130,1,4,1,0,0,0,0,0,0,0,0,0\n40,New (trigger=8, compress=4),84000,140,1,5,1,0,0,0,0,0,0,0,0,0\n45,New (trigger=8, compress=4),91400,150,1,6,1,0,0,0,0,0,0,0,0,0\n50,New (trigger=8, compress=4),73600,120,1,4,2,0,0,0,0,0,0,0,0,0\n55,New (trigger=8, compress=4),81000,130,1,5,2,0,0,0,0,0,0,0,0,0\n60,New (trigger=8, compress=4),88400,140,1,6,2,0,0,0,0,0,0,0,0,0\n65,New (trigger=8, compress=4),95800,150,1,7,2,0,0,0,0,0,0,0,0,0\n70,New (trigger=8, compress=4),95600,160,1,4,3,0,0,0,0,0,0,0,0,0\n75,New (trigger=8, compress=4),85400,130,1,6,3,0,0,0,0,0,0,0,0,0\n80,New (trigger=8, compress=4),92800,140,1,7,3,0,0,0,0,0,0,0,0,0\n85,New (trigger=8, compress=4),92600,150,1,4,4,0,0,0,0,0,0,0,0,0\n90,New (trigger=8, compress=4),82400,120,1,6,4,0,0,0,0,0,0,0,0,0\n95,New (trigger=8, compress=4),89800,130,1,7,4,0,0,0,0,0,0,0,0,0\n100,New (trigger=8, compress=4),89600,140,1,4,5,0,0,0,0,0,0,0,0,0\n105,New (trigger=8, compress=4),79400,110,1,6,5,0,0,0,0,0,0,0,0,0\n110,New (trigger=8, compress=4),86800,120,1,7,5,0,0,0,0,0,0,0,0,0\n115,New (trigger=8, compress=4),86600,130,1,4,6,0,0,0,0,0,0,0,0,0\n120,New (trigger=8, compress=4),94000,140,1,5,6,0,0,0,0,0,0,0,0,0\n125,New (trigger=8, compress=4),83800,110,1,7,6,0,0,0,0,0,0,0,0,0\n130,New (trigger=8, compress=4),83600,120,1,4,7,0,0,0,0,0,0,0,0,0\n135,New (trigger=8, compress=4),91000,130,1,5,7,0,0,0,0,0,0,0,0,0\n140,New (trigger=8, compress=4),80800,100,1,7,7,0,0,0,0,0,0,0,0,0\n145,New (trigger=8, compress=4),80600,110,1,4,8,0,0,0,0,0,0,0,0,0\n150,New (trigger=8, compress=4),82000,120,2,5,4,1,0,0,0,0,0,0,0,0\n155,New (trigger=8, compress=4),89400,130,2,6,4,1,0,0,0,0,0,0,0,0\n160,New (trigger=8, compress=4),71600,100,2,4,5,1,0,0,0,0,0,0,0,0\n165,New (trigger=8, compress=4),79000,110,2,5,5,1,0,0,0,0,0,0,0,0\n170,New (trigger=8, compress=4),86400,120,2,6,5,1,0,0,0,0,0,0,0,0\n175,New (trigger=8, compress=4),93800,130,2,7,5,1,0,0,0,0,0,0,0,0\n180,New (trigger=8, compress=4),93600,140,2,4,6,1,0,0,0,0,0,0,0,0\n185,New (trigger=8, compress=4),83400,110,2,6,6,1,0,0,0,0,0,0,0,0\n190,New (trigger=8, compress=4),90800,120,2,7,6,1,0,0,0,0,0,0,0,0\n195,New (trigger=8, compress=4),90600,130,2,4,7,1,0,0,0,0,0,0,0,0\n200,New (trigger=8, compress=4),80400,100,2,6,7,1,0,0,0,0,0,0,0,0\n205,New (trigger=8, compress=4),87800,110,2,7,7,1,0,0,0,0,0,0,0,0\n210,New (trigger=8, compress=4),87600,120,2,4,8,1,0,0,0,0,0,0,0,0\n215,New (trigger=8, compress=4),89000,130,2,5,4,2,0,0,0,0,0,0,0,0\n220,New (trigger=8, compress=4),78800,100,2,7,4,2,0,0,0,0,0,0,0,0\n225,New (trigger=8, compress=4),78600,110,2,4,5,2,0,0,0,0,0,0,0,0\n230,New (trigger=8, compress=4),86000,120,2,5,5,2,0,0,0,0,0,0,0,0\n235,New (trigger=8, compress=4),93400,130,2,6,5,2,0,0,0,0,0,0,0,0\n240,New (trigger=8, compress=4),75600,100,2,4,6,2,0,0,0,0,0,0,0,0\n245,New (trigger=8, compress=4),83000,110,2,5,6,2,0,0,0,0,0,0,0,0\n250,New (trigger=8, compress=4),90400,120,2,6,6,2,0,0,0,0,0,0,0,0\n255,New (trigger=8, compress=4),72600,90,2,4,7,2,0,0,0,0,0,0,0,0\n260,New (trigger=8, compress=4),80000,100,2,5,7,2,0,0,0,0,0,0,0,0\n265,New (trigger=8, compress=4),87400,110,2,6,7,2,0,0,0,0,0,0,0,0\n270,New (trigger=8, compress=4),94800,120,2,7,7,2,0,0,0,0,0,0,0,0\n275,New (trigger=8, compress=4),94600,130,2,4,8,2,0,0,0,0,0,0,0,0\n280,New (trigger=8, compress=4),96000,140,2,5,4,3,0,0,0,0,0,0,0,0\n285,New (trigger=8, compress=4),85800,110,2,7,4,3,0,0,0,0,0,0,0,0\n290,New (trigger=8, compress=4),85600,120,2,4,5,3,0,0,0,0,0,0,0,0\n295,New (trigger=8, compress=4),93000,130,2,5,5,3,0,0,0,0,0,0,0,0\n300,New (trigger=8, compress=4),82800,100,2,7,5,3,0,0,0,0,0,0,0,0\n305,New (trigger=8, compress=4),82600,110,2,4,6,3,0,0,0,0,0,0,0,0\n310,New (trigger=8, compress=4),90000,120,2,5,6,3,0,0,0,0,0,0,0,0\n315,New (trigger=8, compress=4),79800,90,2,7,6,3,0,0,0,0,0,0,0,0\n320,New (trigger=8, compress=4),79600,100,2,4,7,3,0,0,0,0,0,0,0,0\n325,New (trigger=8, compress=4),87000,110,2,5,7,3,0,0,0,0,0,0,0,0\n330,New (trigger=8, compress=4),94400,120,2,6,7,3,0,0,0,0,0,0,0,0\n335,New (trigger=8, compress=4),76600,90,2,4,8,3,0,0,0,0,0,0,0,0\n340,New (trigger=8, compress=4),78000,100,2,5,4,4,0,0,0,0,0,0,0,0\n345,New (trigger=8, compress=4),85400,110,2,6,4,4,0,0,0,0,0,0,0,0\n350,New (trigger=8, compress=4),92800,120,2,7,4,4,0,0,0,0,0,0,0,0\n355,New (trigger=8, compress=4),92600,130,2,4,5,4,0,0,0,0,0,0,0,0\n360,New (trigger=8, compress=4),82400,100,2,6,5,4,0,0,0,0,0,0,0,0\n365,New (trigger=8, compress=4),89800,110,2,7,5,4,0,0,0,0,0,0,0,0\n370,New (trigger=8, compress=4),89600,120,2,4,6,4,0,0,0,0,0,0,0,0\n375,New (trigger=8, compress=4),79400,90,2,6,6,4,0,0,0,0,0,0,0,0\n380,New (trigger=8, compress=4),86800,100,2,7,6,4,0,0,0,0,0,0,0,0\n385,New (trigger=8, compress=4),86600,110,2,4,7,4,0,0,0,0,0,0,0,0\n390,New (trigger=8, compress=4),94000,120,2,5,7,4,0,0,0,0,0,0,0,0\n395,New (trigger=8, compress=4),83800,90,2,7,7,4,0,0,0,0,0,0,0,0\n400,New (trigger=8, compress=4),83600,100,2,4,8,4,0,0,0,0,0,0,0,0\n405,New (trigger=8, compress=4),85000,110,2,5,4,5,0,0,0,0,0,0,0,0\n410,New (trigger=8, compress=4),92400,120,2,6,4,5,0,0,0,0,0,0,0,0\n415,New (trigger=8, compress=4),74600,90,2,4,5,5,0,0,0,0,0,0,0,0\n420,New (trigger=8, compress=4),82000,100,2,5,5,5,0,0,0,0,0,0,0,0\n425,New (trigger=8, compress=4),89400,110,2,6,5,5,0,0,0,0,0,0,0,0\n430,New (trigger=8, compress=4),71600,80,2,4,6,5,0,0,0,0,0,0,0,0\n435,New (trigger=8, compress=4),79000,90,2,5,6,5,0,0,0,0,0,0,0,0\n440,New (trigger=8, compress=4),86400,100,2,6,6,5,0,0,0,0,0,0,0,0\n445,New (trigger=8, compress=4),93800,110,2,7,6,5,0,0,0,0,0,0,0,0\n450,New (trigger=8, compress=4),93600,120,2,4,7,5,0,0,0,0,0,0,0,0\n455,New (trigger=8, compress=4),83400,90,2,6,7,5,0,0,0,0,0,0,0,0\n460,New (trigger=8, compress=4),90800,100,2,7,7,5,0,0,0,0,0,0,0,0\n465,New (trigger=8, compress=4),90600,110,2,4,8,5,0,0,0,0,0,0,0,0\n470,New (trigger=8, compress=4),92000,120,2,5,4,6,0,0,0,0,0,0,0,0\n475,New (trigger=8, compress=4),81800,90,2,7,4,6,0,0,0,0,0,0,0,0\n480,New (trigger=8, compress=4),81600,100,2,4,5,6,0,0,0,0,0,0,0,0\n485,New (trigger=8, compress=4),89000,110,2,5,5,6,0,0,0,0,0,0,0,0\n490,New (trigger=8, compress=4),78800,80,2,7,5,6,0,0,0,0,0,0,0,0\n495,New (trigger=8, compress=4),78600,90,2,4,6,6,0,0,0,0,0,0,0,0\n500,New (trigger=8, compress=4),86000,100,2,5,6,6,0,0,0,0,0,0,0,0\n";
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'compaction-comparison.csv';
+            a.click();
+        }
+    </script>
+</body>
+</html>

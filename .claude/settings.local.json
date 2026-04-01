@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git restore:*)",
+      "Bash(git reset:*)",
+      "Bash(git remote:*)",
+      "Bash(git fetch:*)",
+      "Bash(npx tsx:*)"
+    ]
+  }
+}
