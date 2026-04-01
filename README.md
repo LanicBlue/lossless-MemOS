@@ -80,6 +80,10 @@ Key configuration options for this fork:
 
 Tested with 10,000-round simulations (~530 tokens/message), achieving stable token control at ~46% budget usage:
 
+![Simulation Results](docs/simulation-results.jpeg)
+
+The chart shows token usage stabilizing at ~92K tokens (46% of 200K budget) after 10,000 rounds, with depth=1 summaries automatically capped at 8 nodes.
+
 | Setting | Value | Description |
 |---------|-------|-------------|
 | `freshTailCount` | 64 | Protects last 64 messages from compaction |
