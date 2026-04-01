@@ -2242,15 +2242,25 @@ export class LcmContextEngine implements ContextEngine {
     try {
       this.ensureMigrated();
 
-      const conversation = await this.conversationStore.getConversationForSession({
-        sessionId: params.sessionId,
-        sessionKey: params.sessionKey,
-      });
-      if (!conversation) {
-        return {
-          messages: params.messages,
-          estimatedTokens: 0,
-        };
+      // Resolve conversation for this session
+      // Persistent agents use a fixed conversation; regular agents use session-scoped ones
+      let conversation: Awaited<ReturnType<typeof this.conversationStore.getOrCreateConversation>>;
+      const agentId = this.extractAgentId(params.sessionKey ?? params.sessionId);
+
+      if (this.isPersistentAgent(agentId)) {
+        conversation = await this.conversationStore.getOrCreatePersistentConversation(agentId!);
+      } else {
+        const bySession = await this.conversationStore.getConversationForSession({
+          sessionId: params.sessionId,
+          sessionKey: params.sessionKey,
+        });
+        if (!bySession) {
+          return {
+            messages: params.messages,
+            estimatedTokens: 0,
+          };
+        }
+        conversation = bySession;
       }
 
       const contextItems = await this.summaryStore.getContextItems(conversation.conversationId);
@@ -2261,16 +2271,17 @@ export class LcmContextEngine implements ContextEngine {
         };
       }
 
-      // Guard against incomplete bootstrap/coverage: if the DB only has
-      // raw context items and clearly trails the current live history, keep
-      // the live path to avoid dropping prompt context.
-      const hasSummaryItems = contextItems.some((item) => item.itemType === "summary");
-      if (!hasSummaryItems && contextItems.length < params.messages.length) {
-        return {
-          messages: params.messages,
-          estimatedTokens: 0,
-        };
-      }
+      // DISABLED: Always assemble from LCM context items regardless of summary presence.
+      // Original guard: if no summaries and context trails live history, skip LCM assembly.
+      // Now: Always use LCM assembly to enable persistent context across /new resets.
+      //
+      // const hasSummaryItems = contextItems.some((item) => item.itemType === "summary");
+      // if (!hasSummaryItems && contextItems.length < params.messages.length) {
+      //   return {
+      //     messages: params.messages,
+      //     estimatedTokens: 0,
+      //   };
+      // }
 
       const tokenBudget = this.applyAssemblyBudgetCap(
         typeof params.tokenBudget === "number" &&
