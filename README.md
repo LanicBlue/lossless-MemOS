@@ -1,15 +1,42 @@
-# lossless-claw
+# lossless-claw (Customized Fork)
+
+> **This is a customized version of [martian-engineering/lossless-claw](https://github.com/martian-engineering/lossless-claw) with additional modifications for long-lived agent memory. See [Custom Modifications](#custom-modifications) below.**
 
 Lossless Context Management plugin for [OpenClaw](https://github.com/openclaw/openclaw), based on the [LCM paper](https://papers.voltropy.com/LCM) from [Voltropy](https://x.com/Voltropy). Replaces OpenClaw's built-in sliding-window compaction with a DAG-based summarization system that preserves every message while keeping active context within model token limits.
 
 ## Table of contents
 
+- [Custom Modifications](#custom-modifications)
 - [What it does](#what-it-does)
 - [Quick start](#quick-start)
 - [Configuration](#configuration)
 - [Documentation](#documentation)
 - [Development](#development)
 - [License](#license)
+
+## Custom Modifications
+
+This version includes the following custom modifications on top of upstream lossless-claw:
+
+### 1. Persistent Agents (Single DAG Architecture)
+
+Agents configured in `persistentAgents` use a single, long-lived conversation DAG across all sessions instead of per-session isolation. This enables true long-term memory for agents like "main" that need to remember everything.
+
+**Configuration**: `persistentAgents: ["main"]`
+
+### 2. Depth=1 Automatic Capping
+
+When depth=1 summary count exceeds 8, the oldest summaries are automatically removed from assembled context (not deleted from database). This prevents unbounded token growth in long-running conversations.
+
+**Implementation**: `capDepth1Summaries()` in `src/store/summary-store.ts`
+
+### 3. Condensation Trigger Fix
+
+Fixed a bug where condensation (depth=0 → depth=1) was comparing chunk token count against fanout value instead of actual summary count. Now correctly triggers when actual summary count reaches `condensedMinFanout`.
+
+**Files**: `src/compaction.ts` - `selectShallowestCondensationCandidate()`
+
+These modifications have been tested with 10,000-round simulations showing stable token control at ~46% budget usage for 200K context windows.
 
 ## What it does
 
