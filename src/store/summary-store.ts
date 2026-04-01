@@ -824,6 +824,85 @@ export class SummaryStore {
     return row?.total ?? 0;
   }
 
+  // ── Depth-based capping ────────────────────────────────────────────────────
+
+  /**
+   * Cap depth=1 summaries by removing oldest from context_items.
+   * When depth=1 count reaches threshold, oldest items are removed to prevent
+   * unbounded token growth and hard triggers.
+   * Summary records remain in summaries table for DAG integrity.
+   *
+   * @returns Number of context_items removed
+   */
+  async capDepth1Summaries(
+    conversationId: number,
+    options?: { maxCount?: number; freshTailCount?: number },
+  ): Promise<number> {
+    const maxCount = options?.maxCount ?? 8;
+
+    const contextItems = await this.getContextItems(conversationId);
+
+    // Find ALL depth=1 summaries (ignoring fresh tail for summaries)
+    // Fresh tail protection applies to messages, not summaries
+    const depth1Summaries: Array<{ ordinal: number; summaryId: string }> = [];
+    for (const item of contextItems) {
+      if (item.itemType === "summary") {
+        const summary = await this.getSummary(item.summaryId!);
+        if (summary && summary.depth === 1) {
+          depth1Summaries.push({ ordinal: item.ordinal, summaryId: item.summaryId! });
+        }
+      }
+    }
+
+    if (depth1Summaries.length <= maxCount) {
+      return 0;
+    }
+
+    // Remove oldest depth=1 items (lowest ordinals first)
+    const toRemove = depth1Summaries.length - maxCount;
+    const ordinalsToRemove = depth1Summaries.slice(0, toRemove).map((s) => s.ordinal);
+
+    if (ordinalsToRemove.length === 0) {
+      return 0;
+    }
+
+    // Delete from context_items only (summaries table stays intact)
+    const placeholders = ordinalsToRemove.map(() => "?").join(",");
+    const result = this.db
+      .prepare(`DELETE FROM context_items WHERE conversation_id = ? AND ordinal IN (${placeholders})`)
+      .run(conversationId, ...ordinalsToRemove);
+
+    // Resequence remaining ordinals to maintain contiguity
+    await this.resequenceContextOrdinals(conversationId);
+
+    console.log(
+      `[capDepth1] removed ${toRemove} depth=1 summaries (${depth1Summaries.length} -> ${depth1Summaries.length - toRemove})`,
+    );
+
+    return toRemove;
+  }
+
+  /**
+   * Resequence context ordinals after deletion to maintain contiguous sequence.
+   */
+  private async resequenceContextOrdinals(conversationId: number): Promise<void> {
+    const items = this.db
+      .prepare(`SELECT ordinal FROM context_items WHERE conversation_id = ? ORDER BY ordinal`)
+      .all(conversationId) as Array<{ ordinal: number }>;
+
+    this.db.exec("BEGIN");
+    try {
+      const updateStmt = this.db.prepare(`UPDATE context_items SET ordinal = ? WHERE conversation_id = ? AND ordinal = ?`);
+      for (let i = 0; i < items.length; i++) {
+        updateStmt.run(i, conversationId, items[i]!.ordinal);
+      }
+      this.db.exec("COMMIT");
+    } catch (err) {
+      this.db.exec("ROLLBACK");
+      throw err;
+    }
+  }
+
   // ── Search ────────────────────────────────────────────────────────────────
 
   async searchSummaries(input: SummarySearchInput): Promise<SummarySearchResult[]> {

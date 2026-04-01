@@ -21,18 +21,14 @@ export type LcmConfig = {
   condensedTargetTokens: number;
   maxExpandTokens: number;
   largeFileTokenThreshold: number;
-  /** Provider override for compaction summarization. */
+  /** Provider override for compaction/conversation summarization. */
   summaryProvider: string;
-  /** Model override for compaction summarization. */
+  /** Model override for compaction/conversation summarization. */
   summaryModel: string;
   /** Provider override for large-file text summarization. */
   largeFileSummaryProvider: string;
   /** Model override for large-file text summarization. */
   largeFileSummaryModel: string;
-  /** Model override for conversation summarization. */
-  summaryModel: string;
-  /** Provider override for conversation summarization. */
-  summaryProvider: string;
   /** Provider override for lcm_expand_query sub-agent. */
   expansionProvider: string;
   /** Model override for lcm_expand_query sub-agent. */
@@ -44,6 +40,8 @@ export type LcmConfig = {
   timezone: string;
   /** When true, retroactively delete HEARTBEAT_OK turn cycles from LCM storage. */
   pruneHeartbeatOk: boolean;
+  /** List of agent IDs that should use persistent memory (e.g., ["main"]). */
+  persistentAgents: string[];
   /** Hard ceiling for assembly token budget — caps runtime-provided and fallback budgets. */
   maxAssemblyTokenBudget?: number;
   /** Maximum allowed overage factor for summaries relative to target tokens (default 3). */
@@ -198,6 +196,7 @@ export function resolveLcmConfig(
       env.LCM_PRUNE_HEARTBEAT_OK !== undefined
         ? env.LCM_PRUNE_HEARTBEAT_OK === "true"
         : toBool(pc.pruneHeartbeatOk) ?? false,
+    persistentAgents: toStrArray(pc.persistentAgents) ?? [],
     maxAssemblyTokenBudget:
       (env.LCM_MAX_ASSEMBLY_TOKEN_BUDGET !== undefined ? parseInt(env.LCM_MAX_ASSEMBLY_TOKEN_BUDGET, 10) : undefined)
         ?? toNumber(pc.maxAssemblyTokenBudget) ?? undefined,

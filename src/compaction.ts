@@ -542,10 +542,19 @@ export class CompactionEngine {
       }
     }
 
+    // Apply depth-based capping after compaction
+    await this.summaryStore.capDepth1Summaries(conversationId, {
+      maxCount: 8,
+      freshTailCount: this.config.freshTailCount,
+    });
+
+    // Recalculate tokens after capping
+    const finalTokens = await this.summaryStore.getContextTokenCount(conversationId);
+
     return {
       actionTaken: true,
       tokensBefore,
-      tokensAfter,
+      tokensAfter: finalTokens,
       createdSummaryId,
       condensed,
       level,
@@ -687,6 +696,12 @@ export class CompactionEngine {
       }
       previousTokens = passTokensAfter;
     }
+
+    // Apply depth-based capping after compaction to prevent unbounded growth
+    await this.summaryStore.capDepth1Summaries(conversationId, {
+      maxCount: 8,
+      freshTailCount: this.config.freshTailCount,
+    });
 
     const tokensAfter = await this.summaryStore.getContextTokenCount(conversationId);
 
@@ -1061,15 +1076,27 @@ export class CompactionEngine {
 
     for (const targetDepth of depthLevels) {
       const fanout = this.resolveFanoutForDepth(targetDepth, hardTrigger);
+
+      // 用实际 summary 数量与 fanout 比较（不受 chunk token 限制）
+      let actualSummaryCount = 0;
+      for (const item of contextItems) {
+        if (item.ordinal >= freshTailOrdinal) break;
+        if (item.itemType !== "summary" || item.summaryId == null) continue;
+        const summary = await this.summaryStore.getSummary(item.summaryId);
+        if (summary && summary.depth === targetDepth) {
+          actualSummaryCount++;
+        }
+      }
+      if (actualSummaryCount < fanout) {
+        continue;
+      }
+
       const chunk = await this.selectOldestChunkAtDepth(
         conversationId,
         targetDepth,
         freshTailOrdinal,
       );
-      if (chunk.items.length < fanout) {
-        continue;
-      }
-      if (chunk.summaryTokens < minChunkTokens) {
+      if (chunk.items.length === 0 || chunk.summaryTokens < minChunkTokens) {
         continue;
       }
       return { targetDepth, chunk };

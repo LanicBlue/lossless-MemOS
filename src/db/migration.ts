@@ -364,6 +364,33 @@ function backfillSummaryMetadata(db: DatabaseSync): void {
 }
 
 /**
+ * Enable persistent memory for designated agents.
+ * This allows agents to have a single, long-lived conversation that spans multiple sessions.
+ */
+function ensurePersistentAgentSupport(db: DatabaseSync): void {
+  // Extend conversations table with agent tracking
+  const conversationColumns = db.prepare(`PRAGMA table_info(conversations)`).all() as Array<{
+    name?: string;
+  }>;
+
+  const hasAgentId = conversationColumns.some((col) => col.name === "agent_id");
+  if (!hasAgentId) {
+    db.exec(`ALTER TABLE conversations ADD COLUMN agent_id TEXT`);
+  }
+
+  const hasIsPersistent = conversationColumns.some((col) => col.name === "is_persistent");
+  if (!hasIsPersistent) {
+    db.exec(`ALTER TABLE conversations ADD COLUMN is_persistent INTEGER NOT NULL DEFAULT 0`);
+  }
+
+  // Create index for fast agent-based queries
+  db.exec(`CREATE INDEX IF NOT EXISTS conversations_agent_idx
+    ON conversations(agent_id, is_persistent)`);
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS conversations_persistent_agent_idx
+    ON conversations(agent_id) WHERE is_persistent = 1`);
+}
+
+/**
  * Backfill tool_call_id, tool_name, and tool_input from metadata JSON for rows
  * where the DB columns are NULL but the values exist in metadata.  This covers
  * legacy text-type parts where the string-content ingestion path stored tool
@@ -580,6 +607,10 @@ export function runLcmMigrations(
   }
 
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS conversations_session_key_idx ON conversations (session_key)`);
+
+  // Initialize persistent agent support
+  ensurePersistentAgentSupport(db);
+
   ensureSummaryDepthColumn(db);
   ensureSummaryMetadataColumns(db);
   ensureSummaryModelColumn(db);

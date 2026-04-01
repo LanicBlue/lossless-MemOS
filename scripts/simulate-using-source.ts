@@ -33,12 +33,12 @@ const DEFAULT_LCM_CONFIG: LcmConfig = {
   statelessSessionPatterns: [],
   skipStatelessSessions: true,
   contextThreshold: 0.75,
-  freshTailCount: 64,
-  leafMinFanout: 16,
+  freshTailCount: 64,  // 恢复 64
+  leafMinFanout: 24,  // 改为 24，减少 depth=0 创建
   condensedMinFanout: 8,
   condensedMinFanoutHard: 2,
   incrementalMaxDepth: 1,
-  leafChunkTokens: 20000,  // chunk 容量仍≈8
+  leafChunkTokens: 20000,
   leafTargetTokens: 2400,
   condensedTargetTokens: 2000,
   maxExpandTokens: 4000,
@@ -56,6 +56,7 @@ const DEFAULT_LCM_CONFIG: LcmConfig = {
   maxAssemblyTokenBudget: undefined,
   summaryMaxOverageFactor: 3,
   customInstructions: "",
+  persistentAgents: [],
 };
 
 const COMPACTION_CONFIG = {
@@ -297,8 +298,8 @@ async function simulate(rounds: number): Promise<Snapshot[]> {
   let totalCondensed = 0;
 
   for (let round = 1; round <= rounds; round++) {
-    // 每轮添加1条消息 (~370 tokens)
-    await sim.addMessage(`Message ${round} - ${"x".repeat(1450)}`);
+    // 每轮添加1条消息 (~530 tokens)
+    await sim.addMessage(`Message ${round} - ${"x".repeat(2100)}`);
 
     // 执行压缩
     const result = await sim.compact();
@@ -330,7 +331,7 @@ function getDepthColor(depth: number): string {
 // 主函数
 async function main() {
   console.log("Starting simulation using source code...");
-  const snapshots = await simulate(5000);
+  const snapshots = await simulate(10000);
 
   // 生成HTML
   const fs = await import("fs");
@@ -367,11 +368,11 @@ async function main() {
   html += '.info-box { background: #2a2a2a; border-radius: 8px; padding: 15px; margin-bottom: 20px; }';
   html += 'canvas { display: block; width: 100%; }';
   html += '</style>\n</head>\n<body>';
-  html += '<h1>Compaction Simulation (Using Source Code) - 5000 rounds</h1>';
+  html += '<h1>Compaction Simulation (Using Source Code) - 10000 rounds</h1>';
   html += '<div class="info-box">';
-  html += '  <strong>配置:</strong> FRESH_TAIL=64 | LEAF_CHUNK_TOKENS=20000 | LEAF_MIN_FANOUT=8 | CONDENSED_MIN_FANOUT=4 | CONDENSED_MIN_FANOUT_HARD=2 | INCREMENTAL_MAX_DEPTH=1 | TOKEN_BUDGET=200K | CONTEXT_THRESHOLD=75%';
+  html += '  <strong>配置:</strong> FRESH_TAIL=64 | LEAF_CHUNK_TOKENS=20000 | LEAF_MIN_FANOUT=24 | CONDENSED_MIN_FANOUT=8 | CONDENSED_MIN_FANOUT_HARD=2 | INCREMENTAL_MAX_DEPTH=1 | TOKEN_BUDGET=200K | CONTEXT_THRESHOLD=75% | depth=1 cap=8';
   html += '</div>';
-  html += '<p style="color:#aaa;"><strong>初始状态</strong>: 0条消息 | <strong>每条消息</strong>: ~370 tokens | <strong>软触发</strong>: fresh tail 外的 messages ≥ 20K tokens (~54条) | <strong>浓缩触发</strong>: CONDENSED_MIN_FANOUT=16 (depth=0→1需16个summaries) | <strong>硬触发</strong>: 总 tokens > 150K (75%)</p>';
+  html += '<p style="color:#aaa;"><strong>初始状态</strong>: 0条消息 | <strong>每条消息</strong>: ~530 tokens | <strong>软触发</strong>: fresh tail 外的 messages ≥ 20K tokens (~38条) | <strong>depth=0→1触发</strong>: 需24个summaries | <strong>depth=1 cap</strong>: 保持最多8个,忽略fresh tail保护</p>';
   html += '<div class="chart-container"><h2>Total Tokens Over Time</h2><canvas id="tokenChart" height="300"></canvas></div>';
   html += '<div class="chart-container"><h2>Messages Count (Total vs Outside Tail)</h2><canvas id="messagesChart" height="300"></canvas></div>';
   html += '<div class="chart-container"><h2>Trigger Status (This Round)</h2><canvas id="triggerChart" height="250"></canvas></div>';

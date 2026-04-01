@@ -1158,6 +1158,27 @@ export class LcmContextEngine implements ContextEngine {
     return normalizedSessionKey || sessionId;
   }
 
+  /** Extract agent ID from session key. Session keys are typically in format "agent:xxx:yyy:zzz". */
+  private extractAgentId(sessionKey: string): string | null {
+    const trimmedKey = sessionKey?.trim();
+    if (!trimmedKey) return null;
+
+    // OpenClaw session key format: "agent:{agentId}:..." or "{agentId}:..."
+    const parts = trimmedKey.split(':');
+    if (parts[0] === 'agent' && parts.length > 1) {
+      return parts[1];
+    }
+    // Fallback: first part is agent ID
+    return parts[0];
+  }
+
+  /** Check if the given agent ID is configured as a persistent agent. */
+  private isPersistentAgent(agentId: string | null): boolean {
+    if (!agentId) return false;
+    const persistentAgents = this.config.persistentAgents ?? [];
+    return persistentAgents.includes(agentId);
+  }
+
   /** Normalize optional live token estimates supplied by runtime callers. */
   private normalizeObservedTokenCount(value: unknown): number | undefined {
     if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
@@ -1730,9 +1751,20 @@ export class LcmContextEngine implements ContextEngine {
             });
           };
 
-          const conversation = await this.conversationStore.getOrCreateConversation(params.sessionId, {
-            sessionKey: params.sessionKey,
-          });
+          // Determine conversation for this session
+          let conversation: Awaited<ReturnType<typeof this.conversationStore.getOrCreateConversation>>;
+          const agentId = this.extractAgentId(params.sessionKey ?? params.sessionId);
+
+          if (this.isPersistentAgent(agentId)) {
+            // Persistent agent: use fixed conversation across all sessions
+            conversation = await this.conversationStore.getOrCreatePersistentConversation(agentId!);
+          } else {
+            // Regular agent: use session-scoped conversation
+            conversation = await this.conversationStore.getOrCreateConversation(params.sessionId, {
+              sessionKey: params.sessionKey,
+            });
+          }
+
           const conversationId = conversation.conversationId;
           const existingCount = await this.conversationStore.getMessageCount(conversationId);
           const bootstrapState =
@@ -1970,9 +2002,17 @@ export class LcmContextEngine implements ContextEngine {
     const stored = toStoredMessage(message);
 
     // Get or create conversation for this session
-    const conversation = await this.conversationStore.getOrCreateConversation(sessionId, {
-      sessionKey,
-    });
+    // Persistent agents use a fixed conversation; regular agents use session-scoped ones
+    let conversation: Awaited<ReturnType<typeof this.conversationStore.getOrCreateConversation>>;
+    const agentId = this.extractAgentId(sessionKey ?? sessionId);
+
+    if (this.isPersistentAgent(agentId)) {
+      conversation = await this.conversationStore.getOrCreatePersistentConversation(agentId!);
+    } else {
+      conversation = await this.conversationStore.getOrCreateConversation(sessionId, {
+        sessionKey,
+      });
+    }
     const conversationId = conversation.conversationId;
 
     let messageForParts = message;

@@ -24,10 +24,15 @@ const BASE_CONFIG: LcmConfig = {
   summaryModel: "",
   largeFileSummaryProvider: "",
   largeFileSummaryModel: "",
+  expansionProvider: "",
+  expansionModel: "",
+  delegationTimeoutMs: 120_000,
   autocompactDisabled: false,
   timezone: "UTC",
   pruneHeartbeatOk: false,
+  persistentAgents: [],
   summaryMaxOverageFactor: 3,
+  customInstructions: "",
 };
 
 function makeExpansionResult() {

@@ -42,9 +42,13 @@ function createTestConfig(databasePath: string): LcmConfig {
     summaryModel: "",
     largeFileSummaryProvider: "",
     largeFileSummaryModel: "",
+    expansionProvider: "",
+    expansionModel: "",
+    delegationTimeoutMs: 120_000,
     autocompactDisabled: false,
     timezone: "UTC",
     pruneHeartbeatOk: false,
+    persistentAgents: [],
     summaryMaxOverageFactor: 3,
     customInstructions: "",
   };
