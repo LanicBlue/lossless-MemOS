@@ -247,7 +247,7 @@ LCM_CONTEXT_THRESHOLD=0.75
 **Key settings explained:**
 
 - **freshTailCount=64** protects the last 64 messages from compaction, giving the model more recent context for continuity
-- **leafMinFanout=24** requires 24+ messages before leaf compression, reducing depth=0 summary creation rate
+- **leafMinFanout=24** requires 24+ messages outside fresh tail before leaf compression triggers
 - **condensedMinFanout=8** requires 8+ depth=0 summaries before condensing to depth=1
 - **depth=1 capping (built-in)** automatically limits depth=1 summaries to 8, preventing unbounded growth
 - **leafChunkTokens=20000** balances chunk size with summary frequency
