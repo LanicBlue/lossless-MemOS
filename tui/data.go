@@ -789,7 +789,19 @@ func lookupConversationID(db *sql.DB, sessionID string) (int64, error) {
 	`, sessionID).Scan(&conversationID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, fmt.Errorf("no LCM conversation found for session %q", sessionID)
+			// No conversation found for this session. For persistent agents, look up by agent_id.
+			// Try "main" as the default persistent agent (common convention)
+			err := db.QueryRow(`
+				SELECT conversation_id
+				FROM conversations
+				WHERE agent_id = 'main' AND is_persistent = 1
+				LIMIT 1
+			`).Scan(&conversationID)
+			if err != nil {
+				// No persistent conversation found either - not an error, just no data yet
+				return 0, nil
+			}
+			return conversationID, nil
 		}
 		return 0, fmt.Errorf("lookup conversation for session %q: %w", sessionID, err)
 	}

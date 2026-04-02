@@ -1179,6 +1179,50 @@ export class LcmContextEngine implements ContextEngine {
     return persistentAgents.includes(agentId);
   }
 
+  /**
+   * Check if a session belongs to a persistent agent by looking up the conversation.
+   * Returns the persistent agent ID if found, null otherwise.
+   */
+  private async getPersistentAgentForSession(
+    sessionId: string,
+    sessionKey?: string,
+  ): Promise<string | null> {
+    // First, try to extract agent ID from sessionKey
+    if (sessionKey) {
+      const agentId = this.extractAgentId(sessionKey);
+      if (this.isPersistentAgent(agentId)) {
+        return agentId;
+      }
+    }
+
+    // Check if this session has an existing conversation that belongs to a persistent agent
+    const bySession = await this.conversationStore.getConversationForSession({
+      sessionId,
+      sessionKey,
+    });
+    if (bySession?.agentId && this.isPersistentAgent(bySession.agentId)) {
+      return bySession.agentId;
+    }
+
+    // If sessionId is a UUID (has dashes), use the first persistent agent as default
+    // This handles the case where OpenClaw passes a UUID sessionId without sessionKey
+    if (sessionId.includes('-')) {
+      const persistentAgents = this.config.persistentAgents ?? [];
+      // If there's exactly one persistent agent configured, use it as default
+      if (persistentAgents.length === 1) {
+        return persistentAgents[0];
+      }
+      // If "main" is a persistent agent, use it as default (common convention)
+      if (this.isPersistentAgent("main")) {
+        return "main";
+      }
+      // Otherwise, can't determine the agent
+      return null;
+    }
+
+    return null;
+  }
+
   /** Normalize optional live token estimates supplied by runtime callers. */
   private normalizeObservedTokenCount(value: unknown): number | undefined {
     if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
@@ -1753,11 +1797,13 @@ export class LcmContextEngine implements ContextEngine {
 
           // Determine conversation for this session
           let conversation: Awaited<ReturnType<typeof this.conversationStore.getOrCreateConversation>>;
-          const agentId = this.extractAgentId(params.sessionKey ?? params.sessionId);
 
-          if (this.isPersistentAgent(agentId)) {
+          // Check if this session belongs to a persistent agent
+          const persistentAgentId = await this.getPersistentAgentForSession(params.sessionId, params.sessionKey);
+
+          if (persistentAgentId) {
             // Persistent agent: use fixed conversation across all sessions
-            conversation = await this.conversationStore.getOrCreatePersistentConversation(agentId!);
+            conversation = await this.conversationStore.getOrCreatePersistentConversation(persistentAgentId);
           } else {
             // Regular agent: use session-scoped conversation
             conversation = await this.conversationStore.getOrCreateConversation(params.sessionId, {
@@ -1996,15 +2042,43 @@ export class LcmContextEngine implements ContextEngine {
     isHeartbeat?: boolean;
   }): Promise<IngestResult> {
     const { sessionId, sessionKey, message, isHeartbeat } = params;
+
+    // Heartbeat handling: skip HEARTBEAT_OK replies, but store other responses
+    if (isHeartbeat && message.role === "assistant") {
+      const content = "content" in message ? message.content : "";
+      const contentStr = typeof content === "string" ? content :
+        Array.isArray(content) ? content.map((c: unknown) => typeof c === "object" && c !== null && "text" in c ? (c as { text: string }).text : "").join("") : "";
+      // Check if this is a HEARTBEAT_OK reply (case-insensitive, trimmed)
+      if (isHeartbeatOkContent(contentStr)) {
+        return { ingested: false };
+      }
+      // Non-HEARTBEAT_OK responses should be stored normally
+      console.error(`[lcm] Heartbeat: storing non-OK response (first 100 chars): ${contentStr.slice(0, 100)}...`);
+    }
+
+    // Filter out system metadata messages that shouldn't be persisted
+    const content = "content" in message ? message.content : "";
+    if (typeof content === "string" && content.includes("Conversation info (untrusted metadata):")) {
+      return { ingested: false };
+    }
+
     const stored = toStoredMessage(message);
 
     // Get or create conversation for this session
     // Persistent agents use a fixed conversation; regular agents use session-scoped ones
     let conversation: Awaited<ReturnType<typeof this.conversationStore.getOrCreateConversation>>;
-    const agentId = this.extractAgentId(sessionKey ?? sessionId);
 
-    if (this.isPersistentAgent(agentId)) {
-      conversation = await this.conversationStore.getOrCreatePersistentConversation(agentId!);
+    // Check if this session belongs to a persistent agent
+    const persistentAgentId = await this.getPersistentAgentForSession(sessionId, sessionKey);
+
+    if (persistentAgentId) {
+      conversation = await this.conversationStore.getOrCreatePersistentConversation(persistentAgentId);
+      // Link this session to the persistent conversation for TUI lookup
+      await this.conversationStore.linkSessionToConversation(
+        sessionId,
+        conversation.conversationId,
+        sessionKey,
+      );
     } else {
       conversation = await this.conversationStore.getOrCreateConversation(sessionId, {
         sessionKey,
@@ -2015,14 +2089,6 @@ export class LcmContextEngine implements ContextEngine {
     // even for heartbeat (which we don't store). This ensures all sessions
     // for a persistent agent resolve to the same conversation.
     if (isHeartbeat) {
-      if (this.isPersistentAgent(agentId)) {
-        // Ensure this session ID maps to the persistent conversation
-        await this.conversationStore.linkSessionToConversation(
-          sessionId,
-          conversation.conversationId,
-          sessionKey,
-        );
-      }
       return { ingested: false };
     }
 
@@ -2217,12 +2283,20 @@ export class LcmContextEngine implements ContextEngine {
           tokenBudget,
           currentTokenCount: liveContextTokens,
           legacyParams,
-        }).catch(() => {
+        }).catch((err) => {
           // Leaf compaction is best-effort and should not fail the caller.
+          console.error(
+            `[lcm] afterTurn: leaf compaction failed for session ${params.sessionId.slice(0, 8)}...:`,
+            err instanceof Error ? err.message : err,
+          );
         });
       }
-    } catch {
+    } catch (err) {
       // Leaf trigger checks are best-effort.
+      console.error(
+        `[lcm] afterTurn: leaf trigger evaluation failed for session ${params.sessionId.slice(0, 8)}...:`,
+        err instanceof Error ? err.message : err,
+      );
     }
 
     try {
@@ -2258,10 +2332,18 @@ export class LcmContextEngine implements ContextEngine {
       // Resolve conversation for this session
       // Persistent agents use a fixed conversation; regular agents use session-scoped ones
       let conversation: Awaited<ReturnType<typeof this.conversationStore.getOrCreateConversation>>;
-      const agentId = this.extractAgentId(params.sessionKey ?? params.sessionId);
 
-      if (this.isPersistentAgent(agentId)) {
-        conversation = await this.conversationStore.getOrCreatePersistentConversation(agentId!);
+      // Check if this session belongs to a persistent agent
+      const persistentAgentId = await this.getPersistentAgentForSession(params.sessionId, params.sessionKey);
+
+      if (persistentAgentId) {
+        conversation = await this.conversationStore.getOrCreatePersistentConversation(persistentAgentId);
+        // Link this session to the persistent conversation for TUI lookup
+        await this.conversationStore.linkSessionToConversation(
+          params.sessionId,
+          conversation.conversationId,
+          params.sessionKey,
+        );
       } else {
         const bySession = await this.conversationStore.getConversationForSession({
           sessionId: params.sessionId,
@@ -2326,6 +2408,7 @@ export class LcmContextEngine implements ContextEngine {
           ? { systemPromptAddition: assembled.systemPromptAddition }
           : {}),
       };
+
       return result;
     } catch {
       return {
@@ -2342,10 +2425,22 @@ export class LcmContextEngine implements ContextEngine {
     threshold: number;
   }> {
     this.ensureMigrated();
-    const conversation = await this.conversationStore.getConversationForSession({
-      sessionId,
-      sessionKey,
-    });
+
+    // Check if this session belongs to a persistent agent
+    const persistentAgentId = await this.getPersistentAgentForSession(sessionId, sessionKey);
+
+    let conversation: Awaited<ReturnType<typeof this.conversationStore.getConversationForSession>> | undefined;
+    if (persistentAgentId) {
+      // For persistent agents, get the persistent conversation directly
+      const persistentConv = await this.conversationStore.getOrCreatePersistentConversation(persistentAgentId);
+      conversation = persistentConv;
+    } else {
+      conversation = await this.conversationStore.getConversationForSession({
+        sessionId,
+        sessionKey,
+      });
+    }
+
     if (!conversation) {
       const fallbackThreshold =
         typeof this.config.leafChunkTokens === "number" &&
@@ -2388,10 +2483,20 @@ export class LcmContextEngine implements ContextEngine {
     return this.withSessionQueue(
       this.resolveSessionQueueKey(params.sessionId, params.sessionKey),
       async () => {
-        const conversation = await this.conversationStore.getConversationForSession({
-          sessionId: params.sessionId,
-          sessionKey: params.sessionKey,
-        });
+        // Check if this session belongs to a persistent agent
+        const persistentAgentId = await this.getPersistentAgentForSession(params.sessionId, params.sessionKey);
+
+        let conversation: Awaited<ReturnType<typeof this.conversationStore.getConversationForSession>> | undefined;
+        if (persistentAgentId) {
+          // For persistent agents, get the persistent conversation directly
+          conversation = await this.conversationStore.getOrCreatePersistentConversation(persistentAgentId);
+        } else {
+          conversation = await this.conversationStore.getConversationForSession({
+            sessionId: params.sessionId,
+            sessionKey: params.sessionKey,
+          });
+        }
+
         if (!conversation) {
           return {
             ok: true,

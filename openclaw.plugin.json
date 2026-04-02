@@ -64,6 +64,10 @@
     "customInstructions": {
       "label": "Custom Instructions",
       "help": "Natural language instructions injected into all summarization prompts (e.g., formatting rules, tone control)"
+    },
+    "pruneHeartbeatOk": {
+      "label": "Prune Heartbeat OK",
+      "help": "When enabled, retroactively delete HEARTBEAT_OK turn cycles from LCM storage"
     }
   },
   "configSchema": {
@@ -150,6 +154,15 @@
       },
       "customInstructions": {
         "type": "string"
+      },
+      "persistentAgents": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "pruneHeartbeatOk": {
+        "type": "boolean"
       }
     }
   }

@@ -966,16 +966,25 @@ export class ConversationStore {
       .get(agentId) as unknown as ConversationRow | undefined;
 
     if (row) {
+      // Only set session_id to agentId if it's currently null/empty.
+      // This preserves session_id values set by linkSessionToConversation().
+      if (!row.session_id || row.session_id.trim() === '') {
+        this.db
+          .prepare(`UPDATE conversations SET session_id = ?, updated_at = datetime('now') WHERE conversation_id = ?`)
+          .run(agentId, row.conversation_id);
+        row.session_id = agentId;
+      }
       return toConversationRecord(row);
     }
 
     // Create new persistent conversation for this agent
+    // Use agentId as session_id so TUI can find it by "main" directly
     const result = this.db
       .prepare(
         `INSERT INTO conversations (session_id, agent_id, is_persistent)
          VALUES (?, ?, 1)`
       )
-      .run(`persistent:${agentId}`, agentId);
+      .run(agentId, agentId);
 
     const newRow = this.db
       .prepare(
