@@ -1999,6 +1999,13 @@ export class LcmContextEngine implements ContextEngine {
     if (isHeartbeat) {
       return { ingested: false };
     }
+
+    // Filter out system metadata messages that shouldn't be persisted
+    const content = "content" in message ? message.content : "";
+    if (typeof content === "string" && content.includes("Conversation info (untrusted metadata):")) {
+      return { ingested: false };
+    }
+
     const stored = toStoredMessage(message);
 
     // Get or create conversation for this session
