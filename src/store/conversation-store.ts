@@ -416,6 +416,42 @@ export class ConversationStore {
       .run(conversationId);
   }
 
+  /**
+   * Link a session ID to an existing conversation.
+   * Used for persistent agents to ensure all sessions (including heartbeat) map to the same conversation.
+   * Since we can't have multiple session_ids point to one conversation, we update the
+   * existing persistent conversation's session_id to the current one.
+   */
+  async linkSessionToConversation(
+    sessionId: string,
+    conversationId: ConversationId,
+    sessionKey?: string,
+  ): Promise<void> {
+    // Get the current session_id for this conversation
+    const row = this.db
+      .prepare(`SELECT session_id FROM conversations WHERE conversation_id = ?`)
+      .get(conversationId) as { session_id: string } | undefined;
+
+    if (!row) {
+      return; // Conversation doesn't exist
+    }
+
+    const currentSessionId = row.session_id;
+
+    // If this session already maps to this conversation, nothing to do
+    if (currentSessionId === sessionId) {
+      return;
+    }
+
+    // Update the persistent conversation's session_id to the current one
+    // This ensures that subsequent lookups by session_id will find the persistent conversation
+    this.db
+      .prepare(
+        `UPDATE conversations SET session_id = ?, session_key = COALESCE(?, session_key), updated_at = datetime('now') WHERE conversation_id = ?`,
+      )
+      .run(sessionId, sessionKey ?? null, conversationId);
+  }
+
   // ── Message operations ────────────────────────────────────────────────────
 
   async createMessage(input: CreateMessageInput): Promise<MessageRecord> {

@@ -1996,9 +1996,6 @@ export class LcmContextEngine implements ContextEngine {
     isHeartbeat?: boolean;
   }): Promise<IngestResult> {
     const { sessionId, sessionKey, message, isHeartbeat } = params;
-    if (isHeartbeat) {
-      return { ingested: false };
-    }
     const stored = toStoredMessage(message);
 
     // Get or create conversation for this session
@@ -2013,6 +2010,22 @@ export class LcmContextEngine implements ContextEngine {
         sessionKey,
       });
     }
+
+    // For persistent agents, always establish session→conversation mapping
+    // even for heartbeat (which we don't store). This ensures all sessions
+    // for a persistent agent resolve to the same conversation.
+    if (isHeartbeat) {
+      if (this.isPersistentAgent(agentId)) {
+        // Ensure this session ID maps to the persistent conversation
+        await this.conversationStore.linkSessionToConversation(
+          sessionId,
+          conversation.conversationId,
+          sessionKey,
+        );
+      }
+      return { ingested: false };
+    }
+
     const conversationId = conversation.conversationId;
 
     let messageForParts = message;
